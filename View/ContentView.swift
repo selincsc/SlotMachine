@@ -12,7 +12,7 @@ import SwiftUI
 struct ContentView: View {
     
     let symbols = ["gfx-bell", "gfx-cherry", "gfx-coin", "gfx-grape", "gfx-seven", "gfx-strawberry"]
-    
+    let haptics = UINotificationFeedbackGenerator()
     @State private var highscore: Int = UserDefaults.standard.integer(forKey: "HighScore")
     @State private var coins: Int = 100
     @State private var betAmount: Int = 10
@@ -21,6 +21,8 @@ struct ContentView: View {
     @State private var isActiveBet10: Bool = true
     @State private var isActiveBet20: Bool = false
     @State private var showingModal: Bool = false
+    @State private var animatingSymbol: Bool = false
+    @State private var animatingModal: Bool =  false
     
 //MARK: -  FUNCTIONS
     
@@ -31,6 +33,8 @@ struct ContentView: View {
         reels = reels.map({ _ in
             Int.random(in: 0...symbols.count - 1 )
         })
+        playSound(sound: "spin", type: "mp3")
+        haptics.notificationOccurred(.success)
     }
     func checkWinning() {
         if reels[0] == reels[1] && reels[1] == reels[2] && reels[0] == reels[2] {
@@ -51,6 +55,7 @@ struct ContentView: View {
     func newHighScore() {
         highscore = coins
         UserDefaults.standard.set(highscore, forKey: "HighScore")
+        playSound(sound: "high-score", type: "mp3")
     }
     func playerLoses() {
         coins -= betAmount
@@ -59,16 +64,19 @@ struct ContentView: View {
         betAmount = 20
         isActiveBet20 = true
         isActiveBet10 = false
+        playSound(sound: "casino-chips", type: "mp3")
     }
     func activateBet10() {
         betAmount = 10
         isActiveBet10 = true
         isActiveBet20 = false
+        playSound(sound: "casino-chips", type: "mp3")
     }
     func isGameOver() {
         if coins <= 0 {
             //show modal window
             showingModal = true
+            playSound(sound: "game-over", type: "mp3")
         }
     }
     func resetGame(){
@@ -76,6 +84,7 @@ struct ContentView: View {
         highscore = 0
         coins = 100
         activateBet10()
+        playSound(sound: "chimeup", type: "mp3")
     }
 
 
@@ -127,6 +136,13 @@ struct ContentView: View {
                         Image(symbols[reels[0]])
                             .resizable()
                             .modifier(ImageModifier())
+                            .opacity(animatingSymbol ? 1 : 0)
+                            .offset(y: animatingSymbol ? 0 : -50)
+                            .animation(.easeOut(duration: Double.random(in: 0.5...0.7)))
+                            .onAppear(perform: {
+                                self.animatingSymbol.toggle()
+                                playSound(sound: "riseup", type: "mp3")
+                            })
                     }
                     HStack(alignment: .center, spacing: 0){
                         //MARK:  reel  2
@@ -135,6 +151,12 @@ struct ContentView: View {
                             Image(symbols[reels[1]])
                                 .resizable()
                                 .modifier(ImageModifier())
+                                .opacity(animatingSymbol ? 1 : 0)
+                                .offset(y: animatingSymbol ? 0 : -50)
+                                .animation(.easeOut(duration: Double.random(in: 0.7...0.9)))
+                                .onAppear(perform: {
+                                    self.animatingSymbol.toggle()
+                                })
                         }
                         Spacer()
                         //MARK: reel 3
@@ -143,16 +165,30 @@ struct ContentView: View {
                             Image(symbols[reels[2]])
                                 .resizable()
                                 .modifier(ImageModifier())
+                                .opacity(animatingSymbol ? 1 : 0)
+                                .offset(y: animatingSymbol ? 0 : -50)
+                                .animation(.easeOut(duration: Double.random(in: 0.9...1.1)))
+                                .onAppear(perform: {
+                                    self.animatingSymbol.toggle()
+                                })
                         }
                     }
                     .frame(maxWidth: 500)
                     //MARK: - spın button
                     Button(action: {
-                        //SPIN THE REELS
+                        //1. set the default state: no animation
+                        withAnimation{
+                            self.animatingSymbol = false
+                        }
+                        //2.SPIN THE REELS
                         self.spinReels()
-                        //CHECKWINNNINGS
+                        //3.trıgger the anımatıon after chargıng the symbols
+                        withAnimation{
+                            self.animatingSymbol = true
+                        }
+                        //4.CHECKWINNNINGS
                         self.checkWinning()
-                        //GAME IS OVER
+                        //5.GAME IS OVER
                         self.isGameOver()
                     }){
                         Image("gfx-spin")
@@ -172,6 +208,7 @@ struct ContentView: View {
                     HStack (alignment: .center, spacing: 10){
                         Button(action: {
                             self.activateBet20()
+                            haptics.notificationOccurred(.success)
                         }){
                             Text("20")
                                 .fontWeight(.heavy)
@@ -181,18 +218,24 @@ struct ContentView: View {
                         .modifier(BetCapsuleModifiers())
                         Image("gfx-casino-chips")
                             .resizable()
+                            .offset(x: isActiveBet20 ? 0 : 20)
                             .opacity(isActiveBet20 ? 1 : 0)
                             .modifier(CasinoChipsModifiers())
+                        
                     }
-                    //MARK: bet 10
+                    Spacer()
+                    
+                    //MARK: - bet 10
                     HStack (alignment: .center, spacing: 10){
                         Image("gfx-casino-chips")
                             .resizable()
+                            .offset(x: isActiveBet10 ? 0 : -20)
                             .opacity(isActiveBet10 ? 1 : 0)
                             .modifier(CasinoChipsModifiers())
                         
                         Button(action: {
                             self.activateBet10()
+                            haptics.notificationOccurred(.success)
                         }){
                             Text("10")
                                 .fontWeight(.heavy)
@@ -200,7 +243,7 @@ struct ContentView: View {
                                 .modifier(BetNumberModifiers())
                         }
                         .modifier(BetCapsuleModifiers())
-                        
+                       
                         
                     }
                 }
@@ -258,7 +301,9 @@ struct ContentView: View {
                                 .layoutPriority(1)
                             Button(action: {
                                 self.showingModal = false
+                                self.animatingSymbol = false
                                 self.coins = 100
+                                self.activateBet10()
                             }){
                                 Text("New Game".uppercased())
                                     .font(.system(.body, design: .rounded))
@@ -280,6 +325,12 @@ struct ContentView: View {
                     .background(Color.white)
                     .cornerRadius(20)
                     .shadow(color: Color("ColorTransparentBlack"), radius: 6, x: 0, y: 8)
+                    .opacity($animatingModal.wrappedValue ? 1 : 0)
+                    .offset(y: $animatingModal.wrappedValue ? 0 : -100)
+                    .animation(Animation.spring(response: 0.6, dampingFraction: 1.0, blendDuration: 1.0))
+                    .onAppear(perform: {
+                        self.animatingModal
+                    })
                 }
             }
         }//:zstack
